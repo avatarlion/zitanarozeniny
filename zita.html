@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Narozeninová výzva – Velká plocha (50 srdíček)</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #gameContainer {
+            position: relative;
+            width: 900px;
+            height: 800px;
+            margin-top: 20px;
+        }
+        canvas {
+            border: 5px solid #ff69b4;
+            border-radius: 25px;
+            box-shadow: 0 0 30px rgba(255,105,180,0.7);
+            background: #fff;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.95);
+            padding: 15px 20px;
+                       border-radius: 20px;
+            font-size: 24px;
+            color: #d81b60;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+        #hud span {
+            font-weight: bold;
+            color: #ff1744;
+            font-size: 28px;
+        }
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.97);
+            padding: 45px;
+            border-radius: 30px;
+            text-align: center;
+            font-size: 28px;
+            color: #d81b60;
+            box-shadow: 0 0 50px rgba(255,105,180,0.9);
+            display: none;
+            max-width: 80%;
+            animation: pulse 2s infinite;
+            z-index: 20;
+        }
+        #message h1 {
+            color: #ff1493;
+            margin: 0 0 20px 0;
+            font-size: 48px;
+        }
+        #message p {
+            margin: 15px 0;
+            font-size: 26px;
+            color: #c51162;
+        }
+        .heart {
+            color: #ff1744;
+            font-size: 36px;
+            animation: heartbeat 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            14% { transform: scale(1.3); }
+            28% { transform: scale(1); }
+            42% { transform: scale(1.3); }
+            70% { transform: scale(1); }
+        }
+        #restart, #playAgain {
+            margin-top: 25px;
+            padding: 15px 30px;
+            background: #ff69b4;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 22px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        #restart:hover, #playAgain:hover {
+            background: #ff1493;
+            transform: scale(1.05);
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,0,0,0.95);
+            color: white;
+            padding: 40px;
+            border-radius: 25px;
+            text-align: center;
+            font-size: 32px;
+            display: none;
+            z-index: 15;
+            box-shadow: 0 0 40px rgba(255,0,0,0.8);
+        }
+        #gameOver h2 {
+            margin: 0 0 20px 0;
+            font-size: 44px;
+            color: #ff5252;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="color: #ff69b4; margin: 15px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); font-size: 36px;">Narozeninová výzva – EPIC SIZE! 🎮</h1>
+    
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="900" height="800"></canvas>
+        
+        <div id="hud">
+            Srdíček: <span id="collected">0</span> / <span id="total">50</span> ❤️
+        </div>
+
+        <div id="message">
+            <h1>Všechno nejlepší! ZITO!!! 🎂✨</h1>
+            <p>Přeji ti oceán štěstí, lásky a neuvěřitelných dobrodružství!🏆 <span class="heart">❤️</span></p>
+            <p>Ať tvůj nový rok překoná všechny předchozí!</p>
+            <p>S láskou a obdivem pro bigbag Z, Matouch </p>
+            <button id="playAgain">Zahrát znovu (50 srdíček)</button>
+        </div>
+
+        <div id="gameOver">
+            <h2>💥 BUM! 💥</h2>
+            <p>Trefila tě bomba!</p>
+            <p>Zkus to znovu Zito </p>
+            <button id="restart">Zkusit znovu</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageDiv = document.getElementById('message');
+        const gameOverDiv = document.getElementById('gameOver');
+        const collectedSpan = document.getElementById('collected');
+        const totalSpan = document.getElementById('total');
+        const restartBtn = document.getElementById('restart');
+        const playAgainBtn = document.getElementById('playAgain');
+
+        canvas.width = 900;
+        canvas.height = 800;
+
+        const player = {
+            x: canvas.width / 2 - 25,
+            y: canvas.height - 100,
+            width: 50,
+            height: 50,
+            speed: 3,  // Zpomaleno z 5 na 3 – klidnější pohyb
+            color: '#ffd700'
+        };
+
+        const heartCount = 50;
+        const gridCols = 10;
+        const gridRows = 8;
+        const cellWidth = canvas.width / gridCols;
+        const cellHeight = (canvas.height - 150) / gridRows;
+        let hearts = [];
+        let bombs = [];
+        let collected = 0;
+        let gameActive = true;
+
+        const keys = {};
+
+        function initHearts() {
+            hearts = [];
+            let index = 0;
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    if (index < heartCount) {
+                        const x = col * cellWidth + (cellWidth - 40) / 2;
+                        const y = 120 + row * cellHeight + (cellHeight - 40) / 2;
+                        hearts.push({
+                            x: x,
+                            y: y,
+                            width: 40,
+                            height: 40,
+                            collected: false,
+                            pulse: index * 0.2
+                        });
+                        index++;
+                    }
+                }
+            }
+        }
+
+        function spawnBomb() {
+            if (Math.random() < 0.012 && bombs.length < 5) {
+                bombs.push({
+                    x: Math.random() * (canvas.width - 40),
+                    y: -60,
+                    width: 40,
+                    height: 50,
+                    speed: 1.8 + Math.random() * 1.8
+                });
+            }
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(player.x + 25, player.y + 25, 25, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(player.x + 18, player.y + 22, 4, 0, Math.PI * 2);
+            ctx.arc(player.x + 32, player.y + 22, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(player.x + 25, player.y + 30, 15, 0, Math.PI);
+            ctx.stroke();
+        }
+
+        function drawHearts() {
+            hearts.forEach(heart => {
+                if (!heart.collected) {
+                    heart.pulse += 0.05;
+                    const scale = 1 + Math.sin(heart.pulse) * 0.1;
+                    
+                    ctx.save();
+                    ctx.translate(heart.x + 20, heart.y + 20);
+                    ctx.scale(scale, scale);
+                    ctx.translate(-20, -20);
+                    
+                    ctx.fillStyle = '#ff1744';
+                    ctx.beginPath();
+                    ctx.moveTo(20, 10);
+                    ctx.bezierCurveTo(20, 5, 15, 0, 10, 5);
+                    ctx.bezierCurveTo(5, 0, 0, 5, 0, 10);
+                    ctx.bezierCurveTo(0, 18, 8, 25, 20, 30);
+                    ctx.bezierCurveTo(32, 25, 40, 18, 40, 10);
+                    ctx.bezierCurveTo(40, 5, 35, 0, 30, 5);
+                    ctx.bezierCurveTo(25, 0, 20, 5, 20, 10);
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+            });
+        }
+
+        function drawBombs() {
+            bombs.forEach((bomb, index) => {
+                ctx.fillStyle = '#212121';
+                ctx.beginPath();
+                ctx.arc(bomb.x + 20, bomb.y + 25, 18, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ff5722';
+                ctx.beginPath();
+                ctx.moveTo(bomb.x + 20, bomb.y);
+                ctx.lineTo(bomb.x + 15, bomb.y - 10);
+                ctx.lineTo(bomb.x + 25, bomb.y - 10);
+                ctx.closePath();
+                ctx.fill();
+
+                bomb.y += bomb.speed;
+
+                if (bomb.y > canvas.height) {
+                    bombs.splice(index, 1);
+                }
+            });
+        }
+
+        function checkCollision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+
+            if (keys.ArrowLeft && player.x > 0) player.x -= player.speed;
+            if (keys.ArrowRight && player.x < canvas.width - player.width) player.x += player.speed;
+            if (keys.ArrowUp && player.y > 0) player.y -= player.speed;
+            if (keys.ArrowDown && player.y < canvas.height - player.height) player.y += player.speed;
+
+            spawnBomb();
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            for (let i = 0; i < 15; i++) {
+                const x = (i * 150 + Date.now() * 0.02) % (canvas.width + 150) - 75;
+                ctx.beginPath();
+                ctx.arc(x, 80 + (i % 3) * 30, 40, 0, Math.PI * 2);
+                ctx.arc(x + 40, 80 + (i % 3) * 30, 50, 0, Math.PI * 2);
+                ctx.arc(x + 80, 80 + (i % 3) * 30, 40, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            drawHearts();
+            drawBombs();
+            drawPlayer();
+
+            hearts.forEach(heart => {
+                if (!heart.collected && checkCollision(player, heart)) {
+                    heart.collected = true;
+                    collected++;
+                    collectedSpan.textContent = collected;
+                    player.color = '#ff69b4';
+                    setTimeout(() => player.color = '#ffd700', 200);
+                }
+            });
+
+            bombs.forEach((bomb, index) => {
+                if (checkCollision(player, bomb)) {
+                    gameActive = false;
+                    gameOverDiv.style.display = 'block';
+                    for (let i = 0; i < 30; i++) {
+                        setTimeout(() => {
+                            ctx.fillStyle = `rgba(255, ${150 + i*4}, 0, ${0.8 - i*0.025})`;
+                            const ex = player.x + 25 + (Math.random() - 0.5) * 120;
+                            const ey = player.y + 25 + (Math.random() - 0.5) * 120;
+                            ctx.beginPath();
+                            ctx.arc(ex, ey, 8 + i*2, 0, Math.PI * 2);
+                            ctx.fill();
+                        }, i * 30);
+                    }
+                }
+            });
+
+            if (collected === heartCount) {
+                gameActive = false;
+                messageDiv.style.display = 'block';
+                return;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.addEventListener('keydown', e => keys[e.key] = true);
+        window.addEventListener('keyup', e => keys[e.key] = false);
+
+        restartBtn.onclick = () => {
+            gameOverDiv.style.display = 'none';
+            initGame();
+            gameLoop();
+        };
+
+        playAgainBtn.onclick = () => {
+            messageDiv.style.display = 'none';
+            initGame();
+            gameLoop();
+        };
+
+        function initGame() {
+            collected = 0;
+            gameActive = true;
+            bombs = [];
+            player.x = canvas.width / 2 - 25;
+            player.y = canvas.height - 100;
+            collectedSpan.textContent = '0';
+            totalSpan.textContent = heartCount;
+            messageDiv.style.display = 'none';
+            gameOverDiv.style.display = 'none';
+            initHearts();
+        }
+
+        initGame();
+        alert('\nPosbírej 50 srdíček  ❤️\nŠipky = pohyb.');
+
+        gameLoop();
+    </script>
+</body>
+</html>
